@@ -1,0 +1,22 @@
+# The study's protocol. Changing a value after runs start makes earlier
+# recursions answer a different question; start a new runs/ directory instead.
+
+[benchmark]
+# Autonomous Science Bench checkout, relative to this repository, and its frozen commit.
+root = "../as-bench"
+commit = "e27a890de1b294760abdcc32f00634111b70e47b"
+
+[protocol]
+steps = 4           # K: improvement steps per recursion
+recursions = 2      # independent recursions per campaign and executor
+base_runs = 3       # runs of the stock harness H0 that start each recursion: the editors' first evidence
+eval_runs = 3       # fresh runs of the selected harness
+base_eval_runs = 0  # fresh stock-harness runs beside them; 0: Base is the opening H0 runs, which no selection touched
+probe_runs = 2      # runs per candidate: single runs are too noisy to screen on
+composed_runs = 2   # runs of each composed harness, which the selection compares
+confirm_runs = 2    # fresh runs of an uncertain winner before it replaces the best harness
+selection = "sequential"  # modeling edits replayed on the incumbent's own trajectories, then screen, confirm, decide
+planner = true      # add a model-guided planning branch wherever a validated modeling procedure exists
+
+[harbor]
+env = "modal"

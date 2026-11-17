@@ -1,0 +1,163 @@
+# The six campaigns of the study. Paths are relative to the campaign's task directory.
+#
+#   catalog, id, input   the public catalog, its design-id column, and the column predict() takes
+#   groups               catalog columns within which designs are ranked (cross-run validation)
+#   objective            the measured value the campaign ranks by; zero_above = [field, limit]
+#                        sets it to 0 when that field exceeds the limit
+#   discovery, gates     the verifier fields an improver may see, and the discovery gates
+#                        among them; every other verifier field stays sealed
+#   hit_at_least,        the hit threshold and the share of the catalog that hits, where the
+#   hit_above,           instruction states them
+#   random_hit_rate
+#   scan                 files and columns whose values the guard keeps out of every harness
+#   seed, fit            the public seed (file and predict()-input column), and the starting procedure's
+#                        options: its featurizer, and the group columns targets are standardized within
+#   timeout_multiplier   agent time limit as a share of the task's 8 h, as in the benchmark's own runs
+#   learning_gate        the verifier's learning gate, as the instruction states it; analysis reports only
+#   model_ms             time per design a delivered model may add to an empty one's in the benchmark's
+#                        sandbox, where each design starts a fresh worker that parses the whole model; set
+#                        well inside the verifier's timeout over its held-out designs (OER: 240 s for 5039,
+#                        where a 3 MB forest adding ~10 ms timed out). Slower harnesses are rejected before they run
+
+[campaigns.nuclease-active-learning]
+task = "tasks/biology/deepmind/nuclease-active-learning"
+catalog = "environment/data/candidate_pool.csv"
+id = "variant_id"
+input = "sequence"
+objective = { field = "activity_class" }
+discovery = ["discovery_hits", "distinct_hit_families", "top_class_found"]
+gates = { discovery_hits = 190, distinct_hit_families = 175 }
+learning_gate = { ndcg_at_100 = 0.42 }
+model_ms = 40
+# The learning requirement and the verifier's model contract, restated from instruction.md, MODEL_FORMAT.md and the
+# verifier (tests/test_outputs.py): what feedback.cross_run, feedback.compare and the procedure bench score, and what
+# contract.check runs every delivered model against. No values from hidden data.
+ranking = { k = 100, relevance = "above", threshold = 1.5 }  # max(activity_class - 1.5, 0)
+contract = { designs = 5000, timeout_s = 540, max_bytes = 4194304 }
+hit_at_least = 2
+seed = [{ file = "environment/data/single_mutant_landscape.csv", input = "sequence" }]
+fit = { featurizer = "mutations" }
+random_hit_rate = 0.1977  # 3954 of 20000
+scan = [
+    { file = "environment/data/candidate_pool.csv", columns = ["variant_id", "sequence"] },
+    { file = "environment/data/single_mutant_landscape.csv", columns = ["variant_id", "sequence"] },
+]
+# The planner (ras/planner/acquire.py): its generic settings, and the instruction's family rule restated (hits are class 2
+# or 3; two variants share a family when their substitution sets, against reference.fasta, differ by at most 3).
+plan = { beta = 1.0, explore_share = 0.25, bootstrap = 8, min_evidence = 0.25, linkage = { reference = "/app/data/reference.fasta", distance = 3, hit_at_least = 2 } }
+
+[campaigns.biosensor-active-learning]
+task = "tasks/biology/jewett-lab/biosensor-active-learning"
+catalog = "environment/data/candidates.csv"
+id = "variant_id"
+input = "sequence"
+objective = { field = "lead_response", zero_above = ["zinc_response", 1.0] }
+discovery = ["discovery_hits"]
+gates = { discovery_hits = 21 }
+learning_gate = { ndcg_at_20 = 0.70 }
+model_ms = 100
+ranking = { k = 20, relevance = "above", threshold = 1.087 }  # score = lead_response, 0 when zinc_response > 1
+contract = { designs = 332, timeout_s = 95, max_bytes = 1048576 }
+hit_at_least = 1.087
+seed = [{ file = "environment/data/seed_measurements.csv", input = "sequence" }]
+fit = { featurizer = "mutations" }
+random_hit_rate = 0.0857  # 58 of 677
+scan = [
+    { file = "environment/data/candidates.csv", columns = ["variant_id", "sequence"] },
+    { file = "environment/data/seed_measurements.csv", columns = ["variant_id", "sequence"] },
+    { file = "environment/data/wild_type_replicates.csv", columns = ["variant_id"] },
+]
+# The planner: the generic settings; hits are counted over the whole catalog, with no groups or families.
+plan = { beta = 1.0, explore_share = 0.25, bootstrap = 8, min_evidence = 0.25 }
+
+[campaigns.propylene-active-learning]
+task = "tasks/chemistry/sargent-lab/propylene-active-learning"
+catalog = "environment/data/candidates.csv"
+id = "composition"
+input = "composition"
+objective = { field = "j_propylene" }
+discovery = ["discovery_hits"]
+gates = { discovery_hits = 7 }
+learning_gate = { ndcg_at_20 = 0.52 }
+model_ms = 150
+ranking = { k = 20, relevance = "above", threshold = 0.911 }  # max(j_propylene - 0.911, 0)
+contract = { designs = 244, timeout_s = 105, max_bytes = 4194304 }
+hit_above = 2.0
+random_hit_rate = 0.0190  # 14 of 736
+seed = [{ file = "environment/data/seed_measurements.csv", input = "composition" }]
+fit = { featurizer = "composition" }
+scan = [
+    { file = "environment/data/candidates.csv", columns = ["composition"] },
+    { file = "environment/data/seed_measurements.csv", columns = ["composition"] },
+]
+
+[campaigns.suzuki-condition-screen]
+task = "tasks/chemistry/pfizer/suzuki-condition-screen"
+catalog = "environment/data/candidate_wells.csv"
+id = "well_id"
+input = "condition"
+groups = ["partner_a", "partner_b"]
+objective = { field = "yield_pct" }
+discovery = ["standout_conditions", "top_conditions", "pairs_covered"]
+gates = { standout_conditions = 32 }
+learning_gate = { ndcg_at_100 = 0.37 }
+model_ms = 50
+# u = (yield - top-64 cutoff) / (best - cutoff) per substrate pair, of its 384 conditions
+ranking = { k = 100, relevance = "group_cutoff", cutoff_share = 0.16666667 }
+contract = { designs = 1844, timeout_s = 240, max_bytes = 4194304 }
+seed = [{ file = "environment/data/chloride_screen.csv", input = "condition" }]
+fit = { featurizer = "tokens", group = ["partner_a", "partner_b"] }
+scan = [
+    { file = "environment/data/candidate_wells.csv", columns = ["well_id", "condition"] },
+    { file = "environment/data/chloride_screen.csv", columns = ["condition"] },
+]
+# The planner: the same generic settings; standouts are counted within each substrate pair, so every pair gets an equal
+# share of each batch.
+plan = { beta = 1.0, explore_share = 0.25, bootstrap = 8, min_evidence = 0.25, allocate = true }
+
+[campaigns.oer-composition-screen]
+task = "tasks/materials/gregoire-lab/oer-composition-screen"
+catalog = "environment/data/candidate_designs.csv"
+id = "sample_id"
+input = "design"
+groups = ["library"]
+objective = { field = "overpotential_v", higher_is_better = false }
+discovery = ["standout_catalysts", "standouts_uncapped", "libraries_screened"]
+gates = { standout_catalysts = 55 }
+learning_gate = { ndcg_at_100 = 0.55 }
+model_ms = 8
+# u = (top-200 cutoff - overpotential) / (cutoff - fifth lowest), capped at 1, per library of 1260 four-cation designs
+ranking = { k = 100, relevance = "group_cutoff", cutoff_share = 0.15873016, top_share = 0.0039682540, cap = true }
+contract = { designs = 5039, timeout_s = 240, max_bytes = 4194304, inputs = "environment/data/evaluation_designs.csv", column = "design" }
+seed = [{ file = "environment/data/endmember_measurements.csv", input = "design" }]
+fit = { featurizer = "composition", group = ["library"] }
+scan = [
+    { file = "environment/data/candidate_designs.csv", columns = ["sample_id", "design", "formula"] },
+    { file = "environment/data/evaluation_designs.csv", columns = ["sample_id", "design", "formula"] },
+    { file = "environment/data/endmember_measurements.csv", columns = ["sample_id", "design"] },
+]
+# The planner: the generic settings; standouts are counted per library, at most 28 from any one, so every library gets
+# an equal share of each batch.
+plan = { beta = 1.0, explore_share = 0.25, bootstrap = 8, min_evidence = 0.25, allocate = true }
+
+[campaigns.coercivity-peak-search]
+task = "tasks/materials/kusne-lab/coercivity-peak-search"
+catalog = "environment/data/candidate_compositions.csv"
+id = "sample_id"
+input = "design"
+objective = { field = "coercivity_mt" }
+discovery = ["discovery_score", "worst_peak_standouts", "peak_standouts", "standouts_peak_1",
+             "standouts_peak_2", "best_coercivity_found_mt"]
+gates = { discovery_score = 0.60 }
+learning_gate = { ndcg_at_20 = 0.65 }
+model_ms = 200
+ranking = { k = 20, relevance = "above", threshold = 8.5 }  # max(coercivity - 8.5, 0)
+contract = { designs = 307, timeout_s = 150, max_bytes = 4194304, inputs = "environment/data/evaluation_compositions.csv", column = "design" }
+timeout_multiplier = 0.5
+seed = [{ file = "environment/data/seed_measurements.csv", input = "design" }]
+fit = { featurizer = "composition" }
+scan = [
+    { file = "environment/data/candidate_compositions.csv", columns = ["sample_id", "design"] },
+    { file = "environment/data/evaluation_compositions.csv", columns = ["sample_id", "design"] },
+    { file = "environment/data/seed_measurements.csv", columns = ["sample_id", "design"] },
+]

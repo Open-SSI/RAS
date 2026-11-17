@@ -1,0 +1,27 @@
+[project]
+name = "ras"
+version = "0.1.0"
+description = "RAS: Recursive Autonomous Science through Self-Improving Agent Harnessing, on Autonomous Science Bench."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = "MIT"
+dependencies = [
+    # Same pin as Autonomous Science Bench's eval group: ras.agents subclasses its agents.
+    "harbor[modal,daytona]==0.21.0",
+    # Deno binary for cross-run validation, which runs models in the benchmark's JS sandbox.
+    "deno==2.9.4",
+]
+
+[dependency-groups]
+# numpy and scikit-learn for the modeling toolkit's tests; campaign images pin the same versions.
+dev = ["pytest==8.4.1", "numpy==2.2.6", "scikit-learn==1.6.1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ras"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

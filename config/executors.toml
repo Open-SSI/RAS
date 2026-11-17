@@ -1,0 +1,36 @@
+# Each executor runs campaigns as a Harbor agent with the harness mounted, and
+# runs its own improver sessions with `improver` in the sandbox (ras/sandbox.py),
+# where "{request}" becomes the session's one-line request and `improver_env`
+# names the only secrets the sandbox gets. Model and effort follow Autonomous
+# Science Bench's evals/agents.toml, so Base matches the benchmark's own presets. CLI versions
+# are pinned here for trials and in docker/improver/Dockerfile for the sandbox, so
+# both run the same build.
+
+[executors.luna]
+agent = "ras.agents:HarnessedCodex"
+model = "gpt-5.6-luna"
+kwargs = { reasoning_effort = "max", version = "0.162.1" }
+# The CLI's own sandbox is off, as in Harbor trials: the container is the sandbox.
+# --json: the session log is the CLI's event stream, with each turn's token usage.
+improver = [
+    "codex", "exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox", "--json",
+    "--model", "gpt-5.6-luna", "--config", 'model_reasoning_effort="max"', "{request}",
+]
+# codex exec reads its API key from CODEX_API_KEY, not OPENAI_API_KEY.
+improver_env = { CODEX_API_KEY = "${OPENAI_API_KEY}" }
+
+[executors.sonnet]
+agent = "ras.agents:HarnessedClaudeCode"
+model = "claude-sonnet-5-5"
+# Trials and improver sessions run on the Claude subscription, not the API: `subscription`
+# drops the API key so the CLI uses CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`),
+# which the sandbox gets in place of the key. It is a kwarg, not CLAUDE_FORCE_OAUTH in `env`,
+# because Harbor scrubs env values it deems secret from every file of the trial.
+kwargs = { reasoning_effort = "high", version = "2.1.309", subscription = true }
+# stream-json: the session log is the CLI's event stream, ending with its usage and cost.
+improver = [
+    "claude", "--print", "{request}", "--model", "claude-sonnet-5-5", "--effort", "high",
+    "--output-format", "stream-json", "--verbose",
+    "--permission-mode", "bypassPermissions", "--disallowedTools", "WebFetch,WebSearch",
+]
+improver_env = { CLAUDE_CODE_OAUTH_TOKEN = "${CLAUDE_CODE_OAUTH_TOKEN}" }

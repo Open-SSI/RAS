@@ -1,0 +1,17 @@
+# Python, build and tooling caches
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.DS_Store
+
+# Recursions, Harbor jobs and improver sessions
+runs/
+
+# Credentials: copy .env.example to .env
+.env
+!.env.example
